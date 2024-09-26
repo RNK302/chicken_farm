@@ -1,4 +1,3 @@
-dd me an column contain of no.of.waterdrink<?php
 session_start(); // Start a session to store user input
 
 // Initialize the session variable if it doesn't exist
