@@ -1,3 +1,4 @@
+<?php
 session_start(); // Start a session to store user input
 
 // Initialize the session variable if it doesn't exist
@@ -14,17 +15,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $noOfFeedbags = $_POST['noOfFeedbags'] ?? '';
     $index = $_POST['index'] ?? null;
 
-    // If editing an existing entry
-    if ($index !== null) {
-        $_SESSION['data'][$index] = [
-            $noOfDays,
-            $noOfChickens,
-            $noOfDeaths,
-            $noOfFeedbags,
-        ];
-    } else {
-        // Store the new data in session
-        if ($noOfDays && $noOfChickens && $noOfDeaths && $noOfFeedbags) {
+    // Validate input to ensure they are numeric
+    if (is_numeric($noOfDays) && is_numeric($noOfChickens) && is_numeric($noOfDeaths) && is_numeric($noOfFeedbags)) {
+        // If editing an existing entry
+        if ($index !== null) {
+            $_SESSION['data'][$index] = [
+                $noOfDays,
+                $noOfChickens,
+                $noOfDeaths,
+                $noOfFeedbags,
+            ];
+        } else {
+            // Store the new data in session
             $_SESSION['data'][] = [
                 $noOfDays,
                 $noOfChickens,
@@ -32,6 +34,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $noOfFeedbags,
             ];
         }
+        
+        // Redirect to avoid form resubmission
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit;
     }
 }
 
@@ -56,6 +62,7 @@ $editData = getEditData($editIndex);
 <body>
 <div class="container mt-5">
     <h2 class="mb-4">Daily Data Entry</h2>
+    
     <form method="post" class="mb-4">
         <input type="hidden" name="index" value="<?= htmlspecialchars($editIndex) ?>">
         <div class="form-group">
@@ -77,7 +84,7 @@ $editData = getEditData($editIndex);
         <button type="submit" class="btn btn-primary"><?= $editIndex !== null ? 'Update' : 'Submit' ?></button>
     </form>
 
-    <h2>Data Table</h2>
+    <h2 class="mb-4">Data Table</h2>
     <table class="table table-bordered">
         <thead>
         <tr>
@@ -89,18 +96,24 @@ $editData = getEditData($editIndex);
         </tr>
         </thead>
         <tbody>
-        <?php
-        // Loop through session data to create rows
-        foreach ($_SESSION['data'] as $index => $row) {
-            echo '<tr>';
-            echo '<td>' . htmlspecialchars($row[0]) . '</td>';
-            echo '<td>' . htmlspecialchars($row[1]) . '</td>';
-            echo '<td>' . htmlspecialchars($row[2]) . '</td>';
-            echo '<td>' . htmlspecialchars($row[3]) . '</td>';
-            echo '<td><a href="?edit=' . $index . '" class="btn btn-warning btn-sm">Edit</a></td>';
-            echo '</tr>';
-        }
-        ?>
+        <?php if (empty($_SESSION['data'])): ?>
+            <tr>
+                <td colspan="5" class="text-center">No data available</td>
+            </tr>
+        <?php else: ?>
+            <?php
+            // Loop through session data to create rows
+            foreach ($_SESSION['data'] as $index => $row) {
+                echo '<tr>';
+                echo '<td>' . htmlspecialchars($row[0]) . '</td>';
+                echo '<td>' . htmlspecialchars($row[1]) . '</td>';
+                echo '<td>' . htmlspecialchars($row[2]) . '</td>';
+                echo '<td>' . htmlspecialchars($row[3]) . '</td>';
+                echo '<td><a href="?edit=' . $index . '" class="btn btn-warning btn-sm">Edit</a></td>';
+                echo '</tr>';
+            }
+            ?>
+        <?php endif; ?>
         </tbody>
     </table>
 </div>
