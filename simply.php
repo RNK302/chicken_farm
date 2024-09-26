@@ -1,125 +1,102 @@
 <?php
-session_start(); // Start a session to store user input
+session_start(); // Start the session
 
-// Initialize the session variable if it doesn't exist
-if (!isset($_SESSION['data'])) {
-    $_SESSION['data'] = [];
+// Initialize data if not already set
+if (!isset($_SESSION['chicken_data'])) {
+    $_SESSION['chicken_data'] = array_fill(1, 31, ['chicken_alive' => '', 'feed_taken' => '', 'reason_of_death' => '']);
 }
 
-// Handle form submission
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Get input values
-    $noOfDays = $_POST['noOfDays'] ?? '';
-    $noOfChickens = $_POST['noOfChickens'] ?? '';
-    $noOfDeaths = $_POST['noOfDeaths'] ?? '';
-    $noOfFeedbags = $_POST['noOfFeedbags'] ?? '';
-    $index = $_POST['index'] ?? null;
-
-    // Validate input to ensure they are numeric
-    if (is_numeric($noOfDays) && is_numeric($noOfChickens) && is_numeric($noOfDeaths) && is_numeric($noOfFeedbags)) {
-        // If editing an existing entry
-        if ($index !== null) {
-            $_SESSION['data'][$index] = [
-                $noOfDays,
-                $noOfChickens,
-                $noOfDeaths,
-                $noOfFeedbags,
-            ];
-        } else {
-            // Store the new data in session
-            $_SESSION['data'][] = [
-                $noOfDays,
-                $noOfChickens,
-                $noOfDeaths,
-                $noOfFeedbags,
-            ];
-        }
-        
-        // Redirect to avoid form resubmission
-        header("Location: " . $_SERVER['PHP_SELF']);
-        exit;
+// Handle form submission via POST request
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit'])) {
+    for ($row = 1; $row <= 31; $row++) {
+        $_SESSION['chicken_data'][$row]['chicken_alive'] = $_POST["chicken_alive_$row"] ?? 0;
+        $_SESSION['chicken_data'][$row]['feed_taken'] = htmlspecialchars($_POST["feed_taken_$row"] ?? '', ENT_QUOTES, 'UTF-8');
+        $_SESSION['chicken_data'][$row]['reason_of_death'] = htmlspecialchars($_POST["reason_of_death_$row"] ?? '', ENT_QUOTES, 'UTF-8');
     }
 }
 
-// Function to populate form fields for editing
-function getEditData($index) {
-    return isset($_SESSION['data'][$index]) ? $_SESSION['data'][$index] : ['', '', '', ''];
+// Handle session reset via POST request
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['reset'])) {
+    session_unset(); // Clear session data
+    session_destroy(); // Optionally destroy the session completely
+    header("Location: " . $_SERVER['PHP_SELF']); // Redirect to the same page to refresh
+    exit;
 }
 
-// Get the index for editing, if provided
-$editIndex = $_GET['edit'] ?? null;
-$editData = getEditData($editIndex);
-?>
+// Start the HTML output
+echo "<!DOCTYPE html>";
+echo "<html>";
+echo "<head>
+        <title>Chicken Data Entry</title>
+        <link rel='stylesheet' href='https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css'>
+        <script src='https://code.jquery.com/jquery-3.5.1.min.js'></script>
+      </head>";
+echo "<body>";
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <title>Daily Data Entry</title>
-</head>
-<body>
-<div class="container mt-5">
-    <h2 class="mb-4">Daily Data Entry</h2>
+echo "<div class='container'>";
+echo "<h1 class='text-center mt-5'>Chicken Data Entry</h1>";
+
+// Create a table
+echo "<form method='post' id='chickenForm' action=''>"; // Start the form
+echo "<table class='table table-bordered mt-3'>";
+
+// Table header
+echo "<tr>
+        <th>Days</th>
+        <th>Chicken Alive</th>
+        <th>Feed Taken</th>
+        <th>Reason of Death</th>
+      </tr>";
+
+// Generate the rows with input fields
+for ($row = 1; $row <= 31; $row++) {
+    $chicken_alive = htmlspecialchars($_SESSION['chicken_data'][$row]['chicken_alive'], ENT_QUOTES, 'UTF-8');
+    $feed_taken = htmlspecialchars($_SESSION['chicken_data'][$row]['feed_taken'], ENT_QUOTES, 'UTF-8');
+    $reason_of_death = htmlspecialchars($_SESSION['chicken_data'][$row]['reason_of_death'], ENT_QUOTES, 'UTF-8');
     
-    <form method="post" class="mb-4">
-        <input type="hidden" name="index" value="<?= htmlspecialchars($editIndex) ?>">
-        <div class="form-group">
-            <label for="noOfDays">No. of Days:</label>
-            <input type="number" name="noOfDays" class="form-control" value="<?= htmlspecialchars($editData[0]) ?>" required>
-        </div>
-        <div class="form-group">
-            <label for="noOfChickens">No. of Chickens:</label>
-            <input type="number" name="noOfChickens" class="form-control" value="<?= htmlspecialchars($editData[1]) ?>" required>
-        </div>
-        <div class="form-group">
-            <label for="noOfDeaths">No. of Deaths:</label>
-            <input type="number" name="noOfDeaths" class="form-control" value="<?= htmlspecialchars($editData[2]) ?>" required>
-        </div>
-        <div class="form-group">
-            <label for="noOfFeedbags">No. of Feedbags:</label>
-            <input type="number" name="noOfFeedbags" class="form-control" value="<?= htmlspecialchars($editData[3]) ?>" required>
-        </div>
-        <button type="submit" class="btn btn-primary"><?= $editIndex !== null ? 'Update' : 'Submit' ?></button>
-    </form>
+    echo "<tr>";
+    echo "<td>$row</td>";  
+    // Updated chicken_alive input field to remove number spinner
+    echo "<td><input type='text' class='form-control' name='chicken_alive_$row' value='$chicken_alive' pattern='[0-9]*' title='Only numbers allowed' required></td>";  
+    echo "<td><input type='text' class='form-control' name='feed_taken_$row' value='$feed_taken'></td>";  
+    echo "<td><input type='text' class='form-control' name='reason_of_death_$row' value='$reason_of_death'></td>";  
+    echo "</tr>";
+}
 
-    <h2 class="mb-4">Data Table</h2>
-    <table class="table table-bordered">
-        <thead>
-        <tr>
-            <th>No. of Days</th>
-            <th>No. of Chickens</th>
-            <th>No. of Deaths</th>
-            <th>No. of Feedbags</th>
-            <th>Actions</th>
-        </tr>
-        </thead>
-        <tbody>
-        <?php if (empty($_SESSION['data'])): ?>
-            <tr>
-                <td colspan="5" class="text-center">No data available</td>
-            </tr>
-        <?php else: ?>
-            <?php
-            // Loop through session data to create rows
-            foreach ($_SESSION['data'] as $index => $row) {
-                echo '<tr>';
-                echo '<td>' . htmlspecialchars($row[0]) . '</td>';
-                echo '<td>' . htmlspecialchars($row[1]) . '</td>';
-                echo '<td>' . htmlspecialchars($row[2]) . '</td>';
-                echo '<td>' . htmlspecialchars($row[3]) . '</td>';
-                echo '<td><a href="?edit=' . $index . '" class="btn btn-warning btn-sm">Edit</a></td>';
-                echo '</tr>';
+echo "</table>";
+echo "<div class='text-center'>
+        <button type='submit' name='submit' class='btn btn-primary'>Submit</button>
+        <button type='button' id='resetButton' class='btn btn-danger'>Reset Data</button>
+      </div>";
+echo "</form>";
+echo "</div>";
+
+echo "<script>
+        // Handle form reset with confirmation
+        $('#resetButton').on('click', function() {
+            if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+                $('<form method=\"post\"><input type=\"hidden\" name=\"reset\"></form>').appendTo('body').submit();
             }
-            ?>
-        <?php endif; ?>
-        </tbody>
-    </table>
-</div>
+        });
 
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-</body>
-</html>
+        // Optional AJAX form submission
+        $('#chickenForm').on('submit', function(e) {
+            e.preventDefault(); // Prevent the default form submission
+            $.ajax({
+                url: '', // Form action to the same page
+                type: 'POST',
+                data: $(this).serialize(),
+                success: function(response) {
+                    alert('Data submitted successfully!');
+                    location.reload(); // Optionally reload the page after successful submission
+                },
+                error: function() {
+                    alert('There was an error submitting the form.');
+                }
+            });
+        });
+      </script>";
+
+echo "</body>";
+echo "</html>";
+?>
