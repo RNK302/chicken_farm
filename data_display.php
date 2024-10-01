@@ -1,29 +1,62 @@
 <?php
 session_start();
 
-// File to store data
-$data_file = 'chicken_data.json';
+// Database connection
+$host = 'localhost'; // Change if necessary
+$db = 'chicken_farm'; // Your database name
+$user = 'root'; // Your database user
+$pass = ''; // Your database password
 
-// Load existing data
-$chicken_data = [];
-if (file_exists($data_file)) {
-    $chicken_data = json_decode(file_get_contents($data_file), true);
+$conn = new mysqli($host, $user, $pass, $db);
+
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
 }
 
 // Initialize filter variables
 $selected_year = '';
 $selected_month = '';
+$selected_batch_no = ''; // New variable for batch number
 $filtered_data = [];
 
 // Handle filter submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['filter'])) {
-    $selected_year = htmlspecialchars($_POST['year'], ENT_QUOTES, 'UTF-8');
+    $selected_year = intval(htmlspecialchars($_POST['year'], ENT_QUOTES, 'UTF-8'));
     $selected_month = intval($_POST['month']);
+    $selected_batch_no = htmlspecialchars($_POST['batch_no'], ENT_QUOTES, 'UTF-8'); // Get batch number
 
-    // Filter data
-    if (isset($chicken_data[$selected_year][$selected_month])) {
-        $filtered_data = $chicken_data[$selected_year][$selected_month];
+    // Prepare the SQL query
+    $sql = "SELECT day, batch_no, death_in_day, feed_taken 
+            FROM chicken_data 
+            WHERE year = ? AND month = ?
+            ORDER BY day"; // Sort by day
+
+    // Append batch number filter if provided
+    if (!empty($selected_batch_no)) {
+        $sql .= " AND batch_no = ?";
     }
+
+    // Prepare and bind parameters
+    $stmt = $conn->prepare($sql);
+    if (!empty($selected_batch_no)) {
+        $stmt->bind_param("iis", $selected_year, $selected_month, $selected_batch_no);
+    } else {
+        $stmt->bind_param("ii", $selected_year, $selected_month);
+    }
+
+    // Execute the statement
+    $stmt->execute();
+
+    // Get the result
+    $result = $stmt->get_result();
+
+    // Fetch data
+    while ($row = $result->fetch_assoc()) {
+        $filtered_data[$row['day']] = $row;
+    }
+
+    $stmt->close();
 }
 
 // Start the HTML output
@@ -42,7 +75,7 @@ echo "<h1 class='text-center mt-5'>Stored Chicken Data</h1>";
 echo "<form method='post' action=''>";
 echo "<div class='form-group'>
         <label for='year'>Year:</label>
-        <input type='text' name='year' class='form-control' value='$selected_year' required>
+        <input type='number' name='year' class='form-control' value='$selected_year' required>
       </div>";
 
 echo "<div class='form-group'>
@@ -54,8 +87,19 @@ for ($m = 1; $m <= 12; $m++) {
 }
 echo "</select></div>";
 
+// New Batch No Input
+echo "<div class='form-group'>
+        <label for='batch_no'>Batch No:</label>
+        <input type='text' name='batch_no' class='form-control' value='$selected_batch_no'>
+      </div>";
+
 echo "<button type='submit' name='filter' class='btn btn-primary'>Filter Data</button>";
 echo "</form>";
+
+// Link to return to data entry
+echo "<div class='text-center mt-4'>
+        <a href='data_entry.php' class='btn btn-secondary'>Back to Data Entry</a>
+      </div>";
 
 // Data Display
 if (!empty($filtered_data)) {
@@ -91,14 +135,13 @@ if (!empty($filtered_data)) {
             <strong>Total Feed Taken:</strong> $total_feed_taken_count
           </div>";
 } else {
-    echo "<div class='alert alert-info mt-4'>No data available for the selected year and month.</div>";
+    echo "<div class='alert alert-info mt-4'>No data available for the selected year, month, and batch number.</div>";
 }
-
-echo "<div class='text-center mt-5'>
-        <a href='data_entry.php' class='btn btn-secondary'>Back to Data Entry</a>
-      </div>";
 
 echo "</div>";
 echo "</body>";
 echo "</html>";
+
+// Close the database connection
+$conn->close();
 ?>
