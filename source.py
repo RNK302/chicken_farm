@@ -1,7 +1,6 @@
 import cv2
 import pyttsx3
 
-
 # Load pre-trained Haar cascades for face and eye detection
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
@@ -24,6 +23,26 @@ def eyes_open(frame_gray, face_region):
     return len(eyes) > 0
 
 
+def enhance_image(frame):
+    """Enhance the image for better visibility in low light."""
+    # Convert to LAB color space
+    lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+
+    # Split LAB into L, A, B channels
+    l, a, b = cv2.split(lab)
+
+    # Apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    cl = clahe.apply(l)
+
+    # Merge back the LAB channels
+    enhanced_lab = cv2.merge((cl, a, b))
+
+    # Convert back to BGR color space
+    enhanced_frame = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
+    return enhanced_frame
+
+
 def main():
     # Open a connection to the webcam
     video_capture = cv2.VideoCapture(0)
@@ -34,6 +53,9 @@ def main():
         if not ret:
             print("Failed to grab frame")
             break
+
+        # Enhance the frame for low-light conditions
+        frame = enhance_image(frame)
 
         # Convert the frame to grayscale for face and eye detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
