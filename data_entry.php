@@ -1,179 +1,139 @@
 <?php
+include 'db.php';
 session_start();
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
+    $batch_no = $_POST['batch_no'];
+    $year = $_POST['year'];
+    $month = $_POST['month'];
+    $total_chickens = $_POST['total_chickens'];
+    $status = ($_POST['action'] === 'complete') ? 'complete' : 'incomplete';
 
-// Database connection
-$host = 'localhost';
-$db = 'chicken_farm';
-$user = 'root';
-$pass = '';
-
-$conn = new mysqli($host, $user, $pass, $db);
-
-// Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
-// Initialize variables
-$days_to_show = 31; // Days to show
-$batch_no = '';
-$existing_data = [];
-$batch_numbers = [];
-
-// Fetch existing batch numbers
-$result = $conn->query("SELECT DISTINCT batch_no FROM chicken_data");
-if ($result) {
-    while ($row = $result->fetch_assoc()) {
-        $batch_numbers[] = $row['batch_no'];
-    }
-}
-
-// Handle form submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
-    $year = intval($_POST['year']);
-    $month = intval($_POST['month']);
-    $batch_no = trim($_POST['batch_no']);
-
-    // Prepare the statement
-    $stmt = $conn->prepare("INSERT INTO chicken_data (year, month, day, batch_no, death_in_day, feed_taken)
-        VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE death_in_day = ?, feed_taken = ?");
-
-    if (!$stmt) {
-        die("Prepare failed: " . $conn->error);
-    }
-
-    // Insert data for each day
-    for ($day = 1; $day <= $days_to_show; $day++) {
-        $death_in_day = intval($_POST["death_in_day_$day"] ?? 0);
-        $feed_taken = intval($_POST["feed_taken_$day"] ?? 0);
-        $stmt->bind_param("iiisiiii", $year, $month, $day, $batch_no, $death_in_day, $feed_taken, $death_in_day, $feed_taken);
-        $stmt->execute();
-    }
-
-    $stmt->close();
-    header("Location: " . $_SERVER['PHP_SELF']);
-    exit();
-}
-
-// Check if a batch number is selected
-if (isset($_GET['batch_no'])) {
-    $batch_no = trim($_GET['batch_no']);
-    $year = intval($_GET['year']);
-    $month = intval($_GET['month']);
-
-    // Fetch existing data for the selected batch number
-    $stmt = $conn->prepare("SELECT * FROM chicken_data WHERE batch_no = ? AND year = ? AND month = ? ORDER BY day");
-    $stmt->bind_param("sii", $batch_no, $year, $month);
+    // Save or update batch status in chicken_batches
+    $stmt = $conn->prepare("INSERT INTO chicken_batches (batch_no, year, month, status)
+                            VALUES (?, ?, ?, ?)
+                            ON DUPLICATE KEY UPDATE status = ?");
+    $stmt->bind_param("sisss", $batch_no, $year, $month, $status, $status);
     $stmt->execute();
-    $result = $stmt->get_result();
 
-    while ($row = $result->fetch_assoc()) {
-        $existing_data[$row['day']] = $row;
+    // Insert daily data loop (make sure this exists or add it below)
+    for ($day = 1; $day <= 31; $day++) {
+        $death = $_POST['death_' . $day] ?? 0;
+        $alive = $_POST['alive_' . $day] ?? 0;
+        $feed = $_POST['feed_' . $day] ?? 0;
+
+        $check = $conn->query("SELECT * FROM chicken_data WHERE batch_no='$batch_no' AND year=$year AND month=$month AND day=$day");
+        if ($check->num_rows > 0) {
+            // update
+            $conn->query("UPDATE chicken_data SET death_in_day=$death, alive_count=$alive, feed_taken=$feed 
+                          WHERE batch_no='$batch_no' AND year=$year AND month=$month AND day=$day");
+        } else {
+            // insert
+            $conn->query("INSERT INTO chicken_data (batch_no, year, month, day, death_in_day, alive_count, feed_taken)
+                          VALUES ('$batch_no', $year, $month, $day, $death, $alive, $feed)");
+        }
     }
-    $stmt->close();
+
+    echo "<script>alert('Data saved as $status'); window.location.href='index.php';</script>";
 }
 
-// Start the HTML output
 ?>
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chicken Data Entry</title>
+    <title>Chicken Farm Data Entry</title>
     <link rel='stylesheet' href='https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css'>
     <script src='https://code.jquery.com/jquery-3.5.1.min.js'></script>
 </head>
 <body>
-<div class='container'>
-    <h1 class='text-center mt-5'>Chicken Data Entry</h1>
-    <form method='post' action=''>
-        <div class='form-group'>
-            <label for='batch_no'>Select Batch No:</label>
-            <select name='batch_no' class='form-control' id='batchSelect' required>
-                <option value=''>Select a Batch</option>
-                <?php foreach ($batch_numbers as $bn): ?>
-                    <option value='<?= $bn ?>' <?= ($bn === $batch_no) ? 'selected' : '' ?>><?= $bn ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class='form-group'>
-            <label for='year'>Year:</label>
-            <input type='number' name='year' class='form-control' value='<?= date('Y') ?>' required>
-        </div>
-        <div class='form-group'>
-            <label for='month'>Select Month:</label>
-            <select name='month' class='form-control' required>
-                <?php for ($m = 1; $m <= 12; $m++): ?>
-                    <option value='<?= $m ?>' <?= ($m === (isset($month) ? $month : 0)) ? 'selected' : '' ?>><?= date('F', mktime(0, 0, 0, $m, 1)) ?></option>
-                <?php endfor; ?>
-            </select>
-        </div>
-        <table class='table table-bordered' id='dataEntryTable'>
-            <thead>
+<div class='container mt-4'>
+    <h2 class='text-center mb-4'>Chicken Daily Entry Form</h2>
+
+    <!-- Top Info Section -->
+    <form method="post" action="">
+         <div class="form-row mb-3">
+    <div class="col">
+        <label>Batch No</label>
+        <input type="text" class="form-control" name="batch_no" placeholder="Enter Batch No" required>
+    </div>
+    <div class="col">
+        <label>Year</label>
+        <input type="number" name="year" class="form-control" value="<?= date('Y') ?>" required>
+    </div>
+    <div class="col">
+        <label>Month</label>
+        <select class="form-control" name="month" required>
+            <?php for ($m = 1; $m <= 12; $m++): ?>
+                <option value="<?= $m ?>"><?= date('F', mktime(0, 0, 0, $m, 1)) ?></option>
+            <?php endfor; ?>
+        </select>
+    </div>
+    <div class="col">
+        <label>Total Chickens (Day 1)</label>
+        <input type="number" id="total_chickens" name="total_chickens" class="form-control" required oninput="updateAliveCounts()">
+    </div>
+</div>
+
+
+        <!-- Daily Data Table -->
+        <table class="table table-bordered text-center">
+            <thead class="thead-dark">
                 <tr>
-                    <th>No. of Days</th>
-                    <th>Death in Day</th>
-                    <th>Feed Taken</th>
+                    <th>Day</th>
+                    <th>Death In Day</th>
+                    <th>Alive Count</th>
+                    <th>Feed Consumed</th>
                 </tr>
             </thead>
             <tbody>
-                <?php for ($day = 1; $day <= $days_to_show; $day++): ?>
-                    <tr>
-                        <td class='day-number'><?= $day ?></td>
-                        <td><input type='number' name='death_in_day_<?= $day ?>' class='form-control' value='<?= $existing_data[$day]['death_in_day'] ?? 0 ?>' required></td>
-                        <td><input type='number' name='feed_taken_<?= $day ?>' class='form-control' value='<?= $existing_data[$day]['feed_taken'] ?? 0 ?>' required></td>
-                    </tr>
-                <?php endfor; ?>
+                <?php for ($day = 1; $day <= 31; $day++): ?>
                 <tr>
-                    <td colspan='3' class='text-center'>
-                        <button type='button' id='addDay' class='btn btn-secondary'>Add Another Day</button>
+                    <td><?= $day ?></td>
+
+                    <!-- Death -->
+                    <td>
+                        <input type="number" class="form-control death" id="death_<?= $day ?>" name="death_<?= $day ?>" value="0" oninput="updateAliveCounts()">
+                    </td>
+
+                    <!-- Alive Count -->
+                    <td>
+                        <input type="number" class="form-control alive" id="alive_<?= $day ?>" name="alive_<?= $day ?>" readonly>
+                    </td>
+
+                    <!-- Feed -->
+                    <td>
+                        <input type="number" class="form-control" name="feed_<?= $day ?>" value="0">
                     </td>
                 </tr>
+                <?php endfor; ?>
             </tbody>
         </table>
-        <button type='submit' name='submit' class='btn btn-primary'>Submit Data</button>
-    </form>
-    <div class='text-center mt-5'>
-        <a href='data_display.php' class='btn btn-secondary'>View Stored Data</a>
-    </div>
+
+        <!-- Submit Button -->
+        <div class="text-center">
+    <button class="btn btn-warning" type="submit" name="action" value="incomplete">💾 Save as Incomplete</button>
+    <button class="btn btn-success" type="submit" name="action" value="complete">✅ Mark as Complete</button>
 </div>
+
+    </form>
+</div>
+
+<!-- JavaScript for Alive Calculation -->
 <script>
-$(document).ready(function() {
-    $('#batchSelect').change(function() {
-        const batch_no = $(this).val();
-        const year = $('input[name="year"]').val();
-        const month = $('select[name="month"]').val();
+function updateAliveCounts() {
+    const totalDays = 31;
+    let totalChickens = parseInt(document.getElementById('total_chickens').value) || 0;
 
-        if (batch_no) {
-            window.location.href = '<?= $_SERVER['PHP_SELF'] ?>?batch_no=' + batch_no + '&year=' + year + '&month=' + month;
-        } else {
-            $('#dataEntryTable tbody').empty();
-            for (let day = 1; day <= 31; day++) {
-                $('#dataEntryTable tbody').append(`
-                    <tr>
-                        <td class='day-number'>${day}</td>
-                        <td><input type='number' name='death_in_day_${day}' class='form-control' required></td>
-                        <td><input type='number' name='feed_taken_${day}' class='form-control' required></td>
-                    </tr>
-                `);
-            }
-        }
-    });
+    for (let day = 1; day <= totalDays; day++) {
+        let prevAlive = (day === 1) 
+            ? totalChickens 
+            : parseInt(document.getElementById('alive_' + (day - 1)).value) || 0;
 
-    $('#addDay').on('click', function() {
-        const table = $('#dataEntryTable tbody');
-        const rowCount = table.children().length - 1; // Exclude the last row (Add Another Day)
-        const newRow = `
-            <tr>
-                <td class='day-number'>${rowCount + 1}</td>
-                <td><input type='number' name='death_in_day_${rowCount + 1}' class='form-control' required></td>
-                <td><input type='number' name='feed_taken_${rowCount + 1}' class='form-control' required></td>
-            </tr>`;
-        table.append(newRow);
-    });
-});
+        let deathToday = parseInt(document.getElementById('death_' + day).value) || 0;
+        let todayAlive = prevAlive - deathToday;
+
+        document.getElementById('alive_' + day).value = (todayAlive >= 0) ? todayAlive : 0;
+    }
+}
 </script>
 </body>
 </html>
-<?php
-$conn->close();
-?>
