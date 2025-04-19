@@ -59,6 +59,7 @@ if ($result) {
             <ul class="list-group">
                 <?php foreach ($completed_batches as $batch): ?>
                     <li class="list-group-item">
+                    <a href="data_entry.php?batch_no=<?= $batch['batch_no'] ?>&year=<?= $batch['year'] ?>&month=<?= $batch['month'] ?>">
                         Batch <?= $batch['batch_no'] ?> - <?= $batch['month'] ?>/<?= $batch['year'] ?>
                     </li>
                 <?php endforeach; ?>
