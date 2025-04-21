@@ -1,137 +1,117 @@
 <?php
 include 'db.php';
 session_start();
-
-
-// Fetch unique incomplete batches
-$incomplete = $conn->query("
-    SELECT DISTINCT batch_no, year, month 
-    FROM chicken_batches 
-    WHERE status = 'incomplete'
-    ORDER BY year DESC, month DESC
-");
-
-// Fetch unique completed batches
-$completed = $conn->query("
-    SELECT DISTINCT batch_no, year, month 
-    FROM chicken_batches 
-    WHERE status = 'complete'
-    ORDER BY year DESC, month DESC
-");
 ?>
 
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Chicken Farm Dashboard</title>
+    <title>Chicken Farm Data Management</title>
     <style>
         body {
-            font-family: 'Segoe UI', sans-serif;
-            padding: 40px;
+            font-family: Arial, sans-serif;
             background-color: #f9f9f9;
+            padding: 20px;
+            text-align: center;
         }
-
         h1 {
-            text-align: center;
             margin-bottom: 30px;
-            color: #333;
         }
-
         .button-container {
-            text-align: center;
             margin-bottom: 40px;
         }
-
-        .button {
-            padding: 12px 24px;
+        button {
+            padding: 10px 20px;
             margin: 0 10px;
-            font-size: 16px;
             border: none;
-            border-radius: 6px;
+            border-radius: 5px;
+            font-size: 16px;
             cursor: pointer;
-            color: white;
-            transition: background-color 0.3s ease;
         }
-
-        .new-entry {
+        .new-btn {
             background-color: #28a745;
+            color: white;
         }
-
-        .new-entry:hover {
-            background-color: #218838;
-        }
-
-        .view-data {
+        .view-btn {
             background-color: #007bff;
+            color: white;
         }
-
-        .view-data:hover {
-            background-color: #0056b3;
-        }
-
         .batch-section {
+            text-align: left;
             max-width: 600px;
-            margin: 0 auto 50px;
+            margin: 0 auto 40px;
         }
-
-        .batch-section h2 {
-            margin-bottom: 15px;
-            color: #444;
-        }
-
-        .batch-link {
-            display: block;
-            padding: 10px 15px;
-            margin-bottom: 8px;
-            background-color: white;
+        .batch-box {
+            background: white;
             border: 1px solid #ccc;
-            border-radius: 6px;
-            text-decoration: none;
-            color: #007bff;
-            transition: background-color 0.2s;
+            border-radius: 5px;
+            padding: 10px 20px;
+            margin-bottom: 10px;
         }
-
-        .batch-link:hover {
-            background-color: #f1f1f1;
+        .batch-box a {
+            color: #007bff;
+            text-decoration: none;
         }
     </style>
 </head>
 <body>
 
-    <h1>Chicken Farm Data Management</h1>
+<h1>Chicken Farm Data Management</h1>
 
-    <div class="button-container">
-        <button class="button new-entry" onclick="window.location.href='data_entry.php'">New Data Entry</button>
-        <button class="button view-data" onclick="window.location.href='data_display.php'">View Stored Data</button>
-    </div>
+<div class="button-container">
+    <button class="new-btn" onclick="location.href='data_entry.php'">New Data Entry</button>
+    <button class="view-btn" onclick="location.href='data_display.php'">View Stored Data</button>
+</div>
 
-    <div class="batch-section">
-        <h2>Incomplete Batches</h2>
-        <?php if ($incomplete->num_rows > 0): ?>
-            <?php while ($row = $incomplete->fetch_assoc()): ?>
-                <a class="batch-link" href="data_entry.php?batch_no=<?= $row['batch_no'] ?>&year=<?= $row['year'] ?>&month=<?= $row['month'] ?>">
-                    Batch <?= htmlspecialchars($row['batch_no']) ?> - <?= $row['month'] ?>/<?= $row['year'] ?>
-                </a>
-            <?php endwhile; ?>
-        <?php else: ?>
-            <p>No incomplete batches found.</p>
-        <?php endif; ?>
-    </div>
+<!-- Incomplete Batches -->
+<div class="batch-section">
+    <h2>Incomplete Batches</h2>
 
-    <div class="batch-section">
-        <h2>Completed Batches</h2>
-        <?php if ($completed->num_rows > 0): ?>
-            <?php while ($row = $completed->fetch_assoc()): ?>
-                <a class="batch-link" href="data_display.php?batch_no=<?= $row['batch_no'] ?>&year=<?= $row['year'] ?>&month=<?= $row['month'] ?>">
-                    Batch <?= htmlspecialchars($row['batch_no']) ?> - <?= $row['month'] ?>/<?= $row['year'] ?>
-                </a>
-            <?php endwhile; ?>
-        <?php else: ?>
-            <p>No completed batches found.</p>
-        <?php endif; ?>
-    </div>
+    <?php
+    $incomplete_sql = "
+        SELECT * FROM chicken_batches cb
+        WHERE status = 'incomplete'
+        AND NOT EXISTS (
+            SELECT 1 FROM chicken_batches cb2
+            WHERE cb.batch_no = cb2.batch_no
+            AND cb.year = cb2.year
+            AND cb.month = cb2.month
+            AND cb2.status = 'complete'
+        )
+    ";
+    $incomplete_result = mysqli_query($conn, $incomplete_sql);
+    if (mysqli_num_rows($incomplete_result) > 0) {
+        while ($row = mysqli_fetch_assoc($incomplete_result)) {
+            echo '<div class="batch-box"><a href="data_entry.php?batch_no=' . $row['batch_no'] . '&year=' . $row['year'] . '&month=' . $row['month'] . '">Batch ' . $row['batch_no'] . ' - ' . $row['month'] . '/' . $row['year'] . '</a></div>';
+        }
+    } else {
+        echo "<p>No incomplete batches found.</p>";
+    }
+    ?>
+</div>
+
+<!-- Completed Batches -->
+<div class="batch-section">
+    <h2>Completed Batches</h2>
+
+    <?php
+    $complete_sql = "
+        SELECT * FROM chicken_batches
+        WHERE status = 'complete'
+        GROUP BY batch_no, year, month
+    ";
+    $complete_result = mysqli_query($conn, $complete_sql);
+    if (mysqli_num_rows($complete_result) > 0) {
+        while ($row = mysqli_fetch_assoc($complete_result)) {
+            echo '<div class="batch-box"><a href="data_entry.php?batch_no=' . $row['batch_no'] . '&year=' . $row['year'] . '&month=' . $row['month'] . '">Batch ' . $row['batch_no'] . ' - ' . $row['month'] . '/' . $row['year'] . '</a></div>';
+        }
+    } else {
+        echo "<p>No completed batches found.</p>";
+    }
+
+    mysqli_close($conn);
+    ?>
+</div>
 
 </body>
 </html>
-
-<?php $conn->close(); ?>
