@@ -81,7 +81,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action'])) {
                     <th>Day</th>
                     <th>Death In Day</th>
                     <th>Alive Count</th>
-                    <th>Feed Consumed</th>
+                    <th>Feed Consumed in kgs</th>
                 </tr>
             </thead>
             <tbody>
