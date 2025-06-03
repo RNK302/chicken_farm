@@ -1,22 +1,25 @@
 CREATE DATABASE chicken_farm;
 USE chicken_farm;
+-- Table for batches
 CREATE TABLE chicken_batches (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    batch_no VARCHAR(50),
-    year INT,
-    month INT,
-    status VARCHAR(20),
-    UNIQUE KEY unique_batch (batch_no, year, month)
+    batch_no VARCHAR(50) NOT NULL,
+    year INT NOT NULL,
+    month INT NOT NULL,
+    status ENUM('incomplete', 'complete') NOT NULL,
+    PRIMARY KEY (batch_no, year, month)
 );
 
+-- Table for daily chicken data
 CREATE TABLE chicken_data (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    batch_no VARCHAR(50),
-    year INT,
-    month INT,
-    day INT,
-    death_in_day INT,
-    alive_count INT,
-    feed_taken INT,
-    UNIQUE KEY unique_day (batch_no, year, month, day)
+    batch_no VARCHAR(50) NOT NULL,
+    year INT NOT NULL,
+    month INT NOT NULL,
+    day INT NOT NULL,
+    death_in_day INT DEFAULT 0,
+    alive_count INT DEFAULT 0,
+    feed_taken INT DEFAULT 0,
+    PRIMARY KEY (batch_no, year, month, day),
+    CONSTRAINT fk_batch FOREIGN KEY (batch_no, year, month)
+        REFERENCES chicken_batches(batch_no, year, month)
+        ON DELETE CASCADE
 );
